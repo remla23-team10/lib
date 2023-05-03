@@ -1,0 +1,38 @@
+name: Release
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+jobs:
+  mvn-deploy:
+    runs-on: ubuntu-22.04
+    steps:
+
+      - uses: actions/checkout@v3
+
+      # This actions sets up java and necessary Maven configuration
+      # to add the github registry and login, under id github
+      - uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'oracle'
+
+      - name: Parse version info from tag
+        run: |
+          # GITHUB_REF is like refs/tags/v2.3.5, so strip the first 11 chars
+          VERSION=${GITHUB_REF:11}
+          MAJOR=`echo "$VERSION" | cut -d . -f 1`
+          MINOR=`echo "$VERSION" | cut -d . -f 2`
+          PATCH=`echo "$VERSION" | cut -d . -f 3`
+          echo "version=$VERSION" >> $GITHUB_ENV
+          echo "version_major=$MAJOR" >> $GITHUB_ENV
+          echo "version_minor=$MINOR" >> $GITHUB_ENV
+          echo "version_patch=$PATCH" >> $GITHUB_ENV
+
+      - name: Update POM version to tag version
+        run: mvn -B versions:set -DnewVersion=${{ env.version }} -DgenerateBackupPoms=false
+
+      - name: Publish package
+        run: mvn --batch-mode deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
